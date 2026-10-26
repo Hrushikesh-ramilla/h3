@@ -675,4 +675,45 @@ describe("serve static (malformed url)", () => {
     expect(servedId).not.toContain("\\"); // no raw backslash separator
     expect(servedId).not.toMatch(/(^|[\\/])\.\.([\\/]|$)/); // no bare `..` segment
   });
+  it("resolves canonical index paths without double slashes for root and subdirectories", async () => {
+    const requestedIds: string[] = [];
+    const app = new H3().all("/**", (event) =>
+      serveStatic(event, {
+        indexNames: ["/index.html"],
+        getMeta: (id) => {
+          requestedIds.push(id);
+          if (id === "/index.html") {
+            return { size: 10 };
+          }
+        },
+        getContents: () => "index content",
+      }),
+    );
+
+    const res = await app.request("/");
+    expect(res.status).toBe(200);
+    expect(requestedIds).toContain("/index.html");
+    expect(requestedIds).not.toContain("//index.html");
+  });
+
+  it("handles relative indexNames correctly for both root and subdirectories", async () => {
+    const requestedIds: string[] = [];
+    const app = new H3().all("/**", (event) =>
+      serveStatic(event, {
+        indexNames: ["index.html"],
+        getMeta: (id) => {
+          requestedIds.push(id);
+          if (id === "/docs/index.html") {
+            return { size: 10 };
+          }
+        },
+        getContents: () => "docs content",
+      }),
+    );
+
+    const res = await app.request("/docs");
+    expect(res.status).toBe(200);
+    expect(requestedIds).toContain("/docs/index.html");
+    expect(requestedIds).not.toContain("/docsindex.html");
+  });
 });
